@@ -7,26 +7,25 @@ import java.util.logging.Logger;
 import sd2526.trab.api.java.Users;
 
 public class GrpcUsersServer extends AbstractGrpcServer {
-public static final int PORT = 13456;
-	
+	public static final int PORT = 13456;
+
 	private static Logger Log = Logger.getLogger(GrpcUsersServer.class.getName());
 
 	public GrpcUsersServer() {
-		super( Log, Users.SERVICE_NAME, PORT);
+		super(Log, Users.SERVICE_NAME, PORT);
 	}
-	
+
 	@Override
 	protected List<GrpcController> controllers(String uri) {
-		return List.of( new GrpcUsersController(), new GrpcAdminUsersController() );
+		return List.of(new GrpcUsersController(), new GrpcAdminUsersController());
 	}
-	
-	public static void main(String[] args) {
+
+	public static void main(String[] args) throws Exception {
 		try {
 			new GrpcUsersServer().start();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
-	
-	
+
 }
