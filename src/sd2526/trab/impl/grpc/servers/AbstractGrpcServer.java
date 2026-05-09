@@ -3,7 +3,6 @@ package sd2526.trab.impl.grpc.servers;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.security.KeyStore;
-import java.security.KeyStoreException;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -62,7 +61,9 @@ public abstract class AbstractGrpcServer extends AbstractServer {
 
 			Server server = builder.build().start();
 
-			Discovery.getInstance().announce(serviceName(), super.serverURI);
+			String serverURI = String.format(SERVER_BASE_URI, IP.hostname(), port, GRPC_CTX);
+
+			Discovery.getInstance().announce(serviceName(), serverURI);
 			Log.info(String.format("%s gRPC Server ready @ %s\n", service, serverURI));
 
 			server.awaitTermination();
