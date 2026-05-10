@@ -13,7 +13,7 @@ import sd2526.trab.impl.zoho.msgs.ZohoFoldersReply;
 import sd2526.trab.impl.zoho.msgs.ZohoMessage;
 import sd2526.trab.impl.zoho.msgs.ZohoMessageReply;
 import sd2526.trab.impl.zoho.msgs.ZohoMessagesReply;
-import sd2526.trab.impl.zoho.msgs.ZohoDeleteReply;
+import sd2526.trab.impl.zoho.msgs.ZohoRemoveInboxReply;
 import sd2526.trab.impl.utils.JSON;
 
 public class Zoho {
@@ -139,7 +139,7 @@ public class Zoho {
         }
     }
 
-    public String deleteMessage(String messageId) throws Exception {
+    public String removeInboxMessage(String messageId) throws Exception {
         var accessToken = new OAuth2AccessToken(tokenManager.getValidAccessToken());
 
         OAuthRequest request = new OAuthRequest(Verb.DELETE,
@@ -150,7 +150,7 @@ public class Zoho {
         try (Response response = service.execute(request)) {
             if (response.isSuccessful()) {
                 var body = response.getBody();
-                var data = JSON.decode(body, ZohoDeleteReply.class).data();
+                var data = JSON.decode(body, ZohoRemoveInboxReply.class).data();
                 return data.cId();
             } else {
                 System.err.println(response.getCode() + "/" + response.getBody());

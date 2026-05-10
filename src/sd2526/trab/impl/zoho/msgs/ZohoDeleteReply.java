@@ -1,5 +1,0 @@
-package sd2526.trab.impl.zoho.msgs;
-
-public record ZohoDeleteReply(ZohoStatus status, ZohoDeleteData data) {
-
-}
