@@ -1,5 +1,7 @@
 package sd2526.trab.impl.zoho;
 
+import java.util.List;
+
 import com.github.scribejava.core.model.OAuth2AccessToken;
 import com.github.scribejava.core.model.OAuthRequest;
 import com.github.scribejava.core.model.Response;
@@ -13,7 +15,6 @@ import sd2526.trab.impl.zoho.msgs.ZohoFoldersReply;
 import sd2526.trab.impl.zoho.msgs.ZohoMessage;
 import sd2526.trab.impl.zoho.msgs.ZohoMessageReply;
 import sd2526.trab.impl.zoho.msgs.ZohoMessagesReply;
-import sd2526.trab.impl.zoho.msgs.ZohoRemoveInboxReply;
 import sd2526.trab.impl.utils.JSON;
 
 public class Zoho {
@@ -139,23 +140,70 @@ public class Zoho {
         }
     }
 
-    public String removeInboxMessage(String messageId) throws Exception {
+    public List<String> getMessages(String query) throws Exception {
         var accessToken = new OAuth2AccessToken(tokenManager.getValidAccessToken());
 
-        OAuthRequest request = new OAuthRequest(Verb.DELETE,
-                MAIL_API_BASE + ACCOUNTS + "/" + accountId + FOLDERS + "/" + inboxFolderId + MESSAGES + "/"
-                        + messageId + "?expunge=true");
+        var url = "";
+
+        if (query == null || query.isEmpty()) {
+            url = MAIL_API_BASE + ACCOUNTS + "/" + accountId + MESSAGES + "/view";
+        } else {
+            url = MAIL_API_BASE + ACCOUNTS + "/" + accountId + MESSAGES + "/search";
+        }
+
+        OAuthRequest request = new OAuthRequest(Verb.GET, url);
+
+        if (query != null && !query.isEmpty()) {
+            request.addQuerystringParameter("searchKey", query);
+        }
         service.signRequest(accessToken, request);
 
         try (Response response = service.execute(request)) {
             if (response.isSuccessful()) {
                 var body = response.getBody();
-                var data = JSON.decode(body, ZohoRemoveInboxReply.class).data();
-                return data.cId();
+                var data = JSON.decode(body, ZohoMessagesReply.class).data();
+                if (data == null)
+                    return List.of();
+                return data.stream().map(ZohoMessage::messageId).toList();
             } else {
+                System.err.println(response.getCode() + "/" + response.getBody());
+                return List.of();
+            }
+        }
+    }
+
+    public void removeInboxMessage(String messageId) throws Exception {
+        var accessToken = new OAuth2AccessToken(tokenManager.getValidAccessToken());
+
+        OAuthRequest request = new OAuthRequest(Verb.DELETE,
+                MAIL_API_BASE + ACCOUNTS + "/" + accountId + FOLDERS + "/" + inboxFolderId + MESSAGES + "/"
+                        + messageId);
+        request.addQuerystringParameter("expunge", "true");
+        service.signRequest(accessToken, request);
+
+        try (Response response = service.execute(request)) {
+            if (!response.isSuccessful()) {
+                System.err.println(response.getCode() + "/" + response.getBody());
+            }
+        }
+    }
+
+    public ZohoMessage getMessageMetadata(String messageId) throws Exception {
+        var accessToken = new OAuth2AccessToken(tokenManager.getValidAccessToken());
+
+        OAuthRequest request = new OAuthRequest(Verb.GET,
+                MAIL_API_BASE + ACCOUNTS + "/" + accountId + "/folders/" + inboxFolderId + MESSAGES + "/" + messageId
+                        + "/details");
+        service.signRequest(accessToken, request);
+
+        try (Response response = service.execute(request)) {
+            if (response.isSuccessful())
+                return JSON.decode(response.getBody(), ZohoMessageReply.class).data();
+            else {
                 System.err.println(response.getCode() + "/" + response.getBody());
                 return null;
             }
         }
     }
+
 }
