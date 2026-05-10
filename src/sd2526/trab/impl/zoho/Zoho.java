@@ -144,7 +144,7 @@ public class Zoho {
 
         OAuthRequest request = new OAuthRequest(Verb.DELETE,
                 MAIL_API_BASE + ACCOUNTS + "/" + accountId + FOLDERS + "/" + inboxFolderId + MESSAGES + "/"
-                        + messageId);
+                        + messageId + "?expunge=true");
         service.signRequest(accessToken, request);
 
         try (Response response = service.execute(request)) {
