@@ -130,7 +130,7 @@ public class MessagesProxy implements Messages {
         return Result.error(NOT_FOUND);
       }
       zoho.removeInboxMessage(mid);
-      return Result.ok(null);
+      return Result.ok();
     } catch (Exception x) {
       x.printStackTrace();
       return Result.error(INTERNAL_ERROR);
@@ -147,16 +147,11 @@ public class MessagesProxy implements Messages {
       var userResult = getUser(name, pwd);
       if (!userResult.isOK())
         return Result.error(userResult.error());
-      ZohoMessage zohoMsg = zoho.getMessage(mid);
-      if (zohoMsg == null) {
-        return Result.ok(null);
-      }
-      if (!zohoMsg.fromAddress().equals(name + "@" + userResult.value().getDomain())) {
-        return Result.error(FORBIDDEN);
-      }
+
+      ZohoMessage zohoMsg = zoho.getMessageMetadata(mid);
       if (zohoMsg.receivedTime() == null
           || System.currentTimeMillis() - Long.parseLong(zohoMsg.receivedTime()) > 30_000) {
-        return Result.ok(null);
+        return Result.ok();
       }
       for (String dest : zohoMsg.toAddress().split(",")) {
         dest = dest.trim();
@@ -168,7 +163,7 @@ public class MessagesProxy implements Messages {
           Clients.AdminMessagesClient.get(domain).remoteDeleteMessage(mid); // not sure if works
         }
       }
-      return Result.ok(null);
+      return Result.ok();
 
     } catch (Exception x) {
       x.printStackTrace();
