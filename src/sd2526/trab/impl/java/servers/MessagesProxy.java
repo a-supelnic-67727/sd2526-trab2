@@ -21,7 +21,7 @@ import sd2526.trab.impl.utils.IP;
 import sd2526.trab.impl.zoho.Zoho;
 import sd2526.trab.impl.zoho.msgs.ZohoMessage;
 
-public class MessagesProxy implements Messages {
+public class MessagesProxy extends JavaMessages1 {
 
   private static Logger Log = Logger.getLogger(MessagesProxy.class.getName());
 
@@ -185,6 +185,25 @@ public class MessagesProxy implements Messages {
         return Result.error(userResult.error());
       var inboxMessages = zoho.getMessages(query);
       return Result.ok(inboxMessages);
+    } catch (Exception x) {
+      x.printStackTrace();
+      return Result.error(INTERNAL_ERROR);
+    }
+  }
+
+  @Override
+  public Result<Void> remotePostMessage(Message msg) {
+    Log.info(() -> "remotePostMessage : msg = %s\n".formatted(msg));
+    try {
+      var zohoMsg = new ZohoMessage(
+          msg.getId(),
+          msg.senderAddress(),
+          String.join(",", msg.getDestination()),
+          msg.getSubject(),
+          msg.getContents(),
+          null);
+      zoho.sendMessage(zohoMsg);
+      return Result.ok();
     } catch (Exception x) {
       x.printStackTrace();
       return Result.error(INTERNAL_ERROR);
