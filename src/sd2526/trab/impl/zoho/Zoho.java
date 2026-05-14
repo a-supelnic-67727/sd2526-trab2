@@ -1,6 +1,7 @@
 package sd2526.trab.impl.zoho;
 
 import java.util.List;
+import java.util.Map;
 
 import com.github.scribejava.core.model.OAuth2AccessToken;
 import com.github.scribejava.core.model.OAuthRequest;
@@ -29,6 +30,7 @@ public class Zoho {
     private static final String FOLDERS = "/folders";
 
     private String accountId;
+    private String mailboxAddress;
     private String inboxFolderId;
 
     final OAuth20Service service;
@@ -43,7 +45,8 @@ public class Zoho {
             var account = getAccount();
             if (account != null) {
                 this.accountId = account.accountId();
-                this.inboxFolderId = getInboxFolderId();
+                this.mailboxAddress = account.mailboxAddress();
+                this.inboxFolderId = getInboxFolderId(); // Está a dar null
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -99,9 +102,15 @@ public class Zoho {
     public String sendMessage(ZohoMessage msg) throws Exception {
         var accessToken = new OAuth2AccessToken(tokenManager.getValidAccessToken());
 
+        var payload = Map.of(
+                "fromAddress", mailboxAddress,
+                "toAddress", mailboxAddress,
+                "subject", msg.subject(),
+                "content", msg.content());
+
         OAuthRequest request = new OAuthRequest(Verb.POST, MAIL_API_BASE + ACCOUNTS + "/" + accountId + MESSAGES);
         request.addHeader("Content-Type", "application/json");
-        request.setPayload(JSON.encode(msg));
+        request.setPayload(JSON.encode(payload));
         service.signRequest(accessToken, request);
 
         try (Response response = service.execute(request)) {
@@ -188,20 +197,14 @@ public class Zoho {
         }
     }
 
-    public ZohoMessage getMessageMetadata(String messageId) throws Exception {
-        var accessToken = new OAuth2AccessToken(tokenManager.getValidAccessToken());
-
-        OAuthRequest request = new OAuthRequest(Verb.GET,
-                MAIL_API_BASE + ACCOUNTS + "/" + accountId + "/folders/" + inboxFolderId + MESSAGES + "/" + messageId
-                        + "/details");
-        service.signRequest(accessToken, request);
-
-        try (Response response = service.execute(request)) {
-            if (response.isSuccessful())
-                return JSON.decode(response.getBody(), ZohoMessageReply.class).data();
-            else {
-                System.err.println(response.getCode() + "/" + response.getBody());
-                return null;
+    public void clearInbox() throws Exception {
+        var msgIds = getMessages(null);
+        for (String msgId : msgIds) {
+            try {
+                removeInboxMessage(msgId);
+            } catch (Exception e) {
+                System.err.println("Error occurred while removing message: " + msgId);
+                e.printStackTrace();
             }
         }
     }
