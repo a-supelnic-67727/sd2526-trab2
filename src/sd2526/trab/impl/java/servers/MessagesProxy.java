@@ -19,6 +19,7 @@ import sd2526.trab.api.java.Result.ErrorCode;
 import sd2526.trab.impl.java.clients.Clients;
 import sd2526.trab.impl.utils.IP;
 import sd2526.trab.impl.zoho.Zoho;
+import sd2526.trab.impl.zoho.ZohoMessageSerializer;
 import sd2526.trab.impl.zoho.msgs.ZohoMessage;
 
 public class MessagesProxy extends JavaMessages1 {
@@ -48,7 +49,7 @@ public class MessagesProxy extends JavaMessages1 {
           senderAddress,
           String.join(",", msg.getDestination()),
           msg.getSubject(),
-          msg.getContents(),
+          ZohoMessageSerializer.serialize(msg),
           null);
       var messageId = zoho.sendMessage(zohoMsg);
       if (messageId == null) {
@@ -79,12 +80,7 @@ public class MessagesProxy extends JavaMessages1 {
       if (zohoMsg == null) {
         return Result.error(NOT_FOUND);
       } else {
-        Message msg = new Message(
-            zohoMsg.messageId(),
-            zohoMsg.fromAddress(),
-            Set.of(zohoMsg.toAddress().split(",")),
-            zohoMsg.subject(),
-            zohoMsg.content());
+        Message msg = ZohoMessageSerializer.deserialize(zohoMsg.content(), zohoMsg.subject());
         return Result.ok(msg);
       }
     } catch (Exception x) {
@@ -105,8 +101,17 @@ public class MessagesProxy extends JavaMessages1 {
       var userResult = getUser(name, pwd);
       if (!userResult.isOK())
         return Result.error(userResult.error());
-      var inboxMessages = zoho.getMessages(null);
-      return Result.ok(inboxMessages);
+      var originalIds = zoho.getMessages(null).stream()
+          .map(zohoMsgId -> {
+            try {
+              ZohoMessage zohoMsg = zoho.getMessage(zohoMsgId);
+              return ZohoMessageSerializer.extractId(zohoMsg.content());
+            } catch (Exception x) {
+              x.printStackTrace();
+              return null;
+            }
+          }).toList();
+      return Result.ok(originalIds);
     } catch (Exception x) {
       x.printStackTrace();
       return Result.error(INTERNAL_ERROR);
@@ -148,11 +153,20 @@ public class MessagesProxy extends JavaMessages1 {
       if (!userResult.isOK())
         return Result.error(userResult.error());
 
-      ZohoMessage zohoMsg = zoho.getMessageMetadata(mid);
-      if (zohoMsg.receivedTime() == null
-          || System.currentTimeMillis() - Long.parseLong(zohoMsg.receivedTime()) > 30_000) {
+      ZohoMessage zohoMsg = zoho.getMessage(mid);
+      if (zohoMsg == null) {
+        return Result.error(NOT_FOUND);
+      }
+
+      Message originalMsg = ZohoMessageSerializer.deserialize(zohoMsg.content(), zohoMsg.subject());
+      if (originalMsg == null) {
+        return Result.error(NOT_FOUND);
+      }
+
+      if (System.currentTimeMillis() - originalMsg.getCreationTime() > 30_000) {
         return Result.ok();
       }
+
       for (String dest : zohoMsg.toAddress().split(",")) {
         dest = dest.trim();
         var domain = dest.split("@", 2)[1];
@@ -160,7 +174,7 @@ public class MessagesProxy extends JavaMessages1 {
         if (domain.equals(IP.domain())) {
           zoho.removeInboxMessage(mid);
         } else {
-          Clients.AdminMessagesClient.get(domain).remoteDeleteMessage(mid); // not sure if works
+          Clients.AdminMessagesClient.get(domain).remoteDeleteMessage(originalMsg.getId());
         }
       }
       return Result.ok();
@@ -183,8 +197,17 @@ public class MessagesProxy extends JavaMessages1 {
       var userResult = getUser(name, pwd);
       if (!userResult.isOK())
         return Result.error(userResult.error());
-      var inboxMessages = zoho.getMessages(query);
-      return Result.ok(inboxMessages);
+      var originalIds = zoho.getMessages(query).stream()
+          .map(zohoMsgId -> {
+            try {
+              ZohoMessage zohoMsg = zoho.getMessage(zohoMsgId);
+              return ZohoMessageSerializer.extractId(zohoMsg.content());
+            } catch (Exception x) {
+              x.printStackTrace();
+              return null;
+            }
+          }).toList();
+      return Result.ok(originalIds);
     } catch (Exception x) {
       x.printStackTrace();
       return Result.error(INTERNAL_ERROR);
@@ -200,9 +223,21 @@ public class MessagesProxy extends JavaMessages1 {
           msg.senderAddress(),
           String.join(",", msg.getDestination()),
           msg.getSubject(),
-          msg.getContents(),
+          ZohoMessageSerializer.serialize(msg),
           null);
       zoho.sendMessage(zohoMsg);
+      return Result.ok();
+    } catch (Exception x) {
+      x.printStackTrace();
+      return Result.error(INTERNAL_ERROR);
+    }
+  }
+
+  @Override
+  public Result<Void> remoteDeleteMessage(String mid) {
+    Log.info(() -> "remoteDeleteMessage : mid = %s\n".formatted(mid));
+    try {
+      zoho.removeInboxMessage(mid);
       return Result.ok();
     } catch (Exception x) {
       x.printStackTrace();

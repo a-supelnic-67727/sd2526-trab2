@@ -5,10 +5,11 @@ import java.util.List;
 import jakarta.inject.Singleton;
 import sd2526.trab.api.Message;
 import sd2526.trab.api.rest.RestMessages;
+import sd2526.trab.impl.api.rest.RestAdminMessages;
 import sd2526.trab.impl.java.servers.MessagesProxy;
 
 @Singleton
-public class RestMessagesProxyResource extends RestResource implements RestMessages {
+public class RestMessagesProxyResource extends RestResource implements RestMessages, RestAdminMessages {
 
   private final MessagesProxy impl = new MessagesProxy();
 
@@ -39,4 +40,20 @@ public class RestMessagesProxyResource extends RestResource implements RestMessa
   public void deleteMessage(String name, String mid, String pwd) {
     super.resultOrThrow(impl.deleteMessage(name, mid, pwd));
   }
+
+  @Override
+  public void remotePostMessage(Message m) {
+    super.resultOrThrow(impl.remotePostMessage(m));
+  }
+
+  @Override
+  public void remoteDeleteMessage(String mid) {
+    super.resultOrThrow(impl.remoteDeleteMessage(mid));
+  }
+
+  @Override
+  public void remoteDeleteUserInbox(String name) {
+    super.resultOrThrow(impl.remoteDeleteUserInbox(name));
+  }
+
 }
