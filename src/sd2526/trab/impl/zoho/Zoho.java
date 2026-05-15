@@ -23,7 +23,7 @@ public class Zoho {
 
     static final String CLIENT_ID = "1000.FLLFY50XXI3MDNGK5J5LD6C0MWZH0Z";
     static final String CLIENT_SECRET = "b2353340ef9d41595cf22ed06e62b0d0064e3ed1da";
-    static final String REFRESH_TOKEN = "1000.cd46c4ce1bdc97804f2cf7b264ae0489.11a0c5734a1cc48b244d2ba3246138db";
+    static final String REFRESH_TOKEN = "1000.fa68bb9e170e3bbe34dcc6ca15d84089.c4618531950aac1c05d2bbbda10f3987";
 
     private static final String ACCOUNTS = "/accounts";
     private static final String MESSAGES = "/messages";
