@@ -34,9 +34,12 @@ public class MessagesProxy extends JavaMessages1 {
     }
 
     try {
+
       var userResult = getUser(msg.getSender(), pwd);
       if (!userResult.isOK())
         return Result.error(userResult.error());
+      if (idMap.containsKey(msg.getId()))
+        return Result.ok();
       var user = userResult.value();
       String senderAddress = user.getName() + "@" + user.getDomain();
       msg.setSender("%s <%s@%s>".formatted(user.getDisplayName(), user.getName(), user.getDomain()));
@@ -48,7 +51,8 @@ public class MessagesProxy extends JavaMessages1 {
           ZohoMessageSerializer.serialize(msg),
           null);
       var messageId = zoho.sendMessage(zohoMsg);
-      idMap.put(msg.getId(), messageId);
+      var zohoInboxMsgId = zoho.updateZohoId(msg.getId());
+      idMap.put(msg.getId(), zohoInboxMsgId);
       if (messageId == null) {
         return Result.error(INTERNAL_ERROR);
       } else {
@@ -73,6 +77,12 @@ public class MessagesProxy extends JavaMessages1 {
       if (!userResult.isOK())
         return Result.error(userResult.error());
       var zohoId = idMap.get(mid);
+      if (zohoId == null) {
+        zohoId = zoho.updateZohoId(mid);
+        if (zohoId != null) {
+          idMap.put(mid, zohoId);
+        }
+      }
       ZohoMessage zohoMsg = zoho.getMessage(zohoId);
       if (zohoMsg == null) {
         return Result.error(NOT_FOUND);
@@ -133,6 +143,12 @@ public class MessagesProxy extends JavaMessages1 {
         return Result.error(userResult.error());
 
       var zohoId = idMap.get(mid);
+      if (zohoId == null) {
+        zohoId = zoho.updateZohoId(mid);
+        if (zohoId != null) {
+          idMap.put(mid, zohoId);
+        }
+      }
       Log.info("Zoho message id: " + zohoId);
       ZohoMessage zohoMsg = zoho.getMessage(zohoId);
       if (zohoMsg == null) {
@@ -226,6 +242,8 @@ public class MessagesProxy extends JavaMessages1 {
   public Result<Void> remotePostMessage(Message msg) {
     Log.info(() -> "remotePostMessage : msg = %s\n".formatted(msg));
     try {
+      if (idMap.putIfAbsent(msg.getId(), "pending") != null)
+        return Result.ok();
       var zohoMsg = new ZohoMessage(
           msg.getId(),
           msg.senderAddress(),
@@ -233,8 +251,9 @@ public class MessagesProxy extends JavaMessages1 {
           msg.getSubject(),
           ZohoMessageSerializer.serialize(msg),
           null);
-      var messageId = zoho.sendMessage(zohoMsg);
-      idMap.put(msg.getId(), messageId);
+      zoho.sendMessage(zohoMsg);
+      var zohoInboxMsgId = zoho.updateZohoId(msg.getId());
+      idMap.put(msg.getId(), zohoInboxMsgId);
       return Result.ok();
     } catch (Exception x) {
       x.printStackTrace();

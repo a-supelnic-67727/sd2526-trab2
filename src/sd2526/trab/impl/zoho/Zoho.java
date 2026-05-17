@@ -177,7 +177,6 @@ public class Zoho {
                 var data = JSON.decode(body, ZohoMessagesReply.class).data();
                 if (data == null)
                     return List.of();
-                Log.info("Retrieved this id: " + data.stream().map(ZohoMessage::messageId).toList().get(0));
                 return data.stream().map(ZohoMessage::messageId).toList();
             } else {
                 System.err.println(response.getCode() + "/" + response.getBody());
@@ -216,15 +215,19 @@ public class Zoho {
         }
     }
 
-    public ZohoMessage getMessageByCreationTime(long creationTime) throws Exception {
-        var zohoIds = getMessages(null);
-        for (var zohoId : zohoIds) {
-            var msg = getMessage(zohoId);
-            if (msg != null) {
-                var deserialized = ZohoMessageSerializer.deserialize(msg.content(), msg.subject());
-                if (deserialized != null && deserialized.getCreationTime() == creationTime)
-                    return msg;
+    public String updateZohoId(String mid) throws Exception {
+        long deadline = System.currentTimeMillis() + 10_000;
+        while (System.currentTimeMillis() < deadline) {
+            var zohoIds = getMessages(null);
+            for (var zohoId : zohoIds) {
+                var msg = getMessage(zohoId);
+                if (msg != null) {
+                    var deserialized = ZohoMessageSerializer.deserialize(msg.content(), msg.subject());
+                    if (deserialized != null && deserialized.getId().equals(mid))
+                        return zohoId;
+                }
             }
+            Thread.sleep(1000);
         }
         return null;
     }
