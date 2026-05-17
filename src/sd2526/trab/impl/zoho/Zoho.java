@@ -2,6 +2,7 @@ package sd2526.trab.impl.zoho;
 
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 
 import com.github.scribejava.core.model.OAuth2AccessToken;
 import com.github.scribejava.core.model.OAuthRequest;
@@ -33,6 +34,8 @@ public class Zoho {
     private String mailboxAddress;
     private String inboxFolderId;
 
+    private static Logger Log = Logger.getLogger(Zoho.class.getName());
+
     final OAuth20Service service;
     final ZohoTokenManager tokenManager;
 
@@ -46,7 +49,7 @@ public class Zoho {
             if (account != null) {
                 this.accountId = account.accountId();
                 this.mailboxAddress = account.mailboxAddress();
-                this.inboxFolderId = getInboxFolderId(); // Está a dar null
+                this.inboxFolderId = getInboxFolderId();
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -70,7 +73,7 @@ public class Zoho {
             if (response.isSuccessful()) {
                 var folders = JSON.decode(response.getBody(), ZohoFoldersReply.class).data();
                 return folders.stream()
-                        .filter(f -> "Inbox".equals(f.folderType()))
+                        .filter(f -> "Inbox".equals(f.folderName()))
                         .map(ZohoFolder::folderId)
                         .findFirst()
                         .orElse(null);
@@ -106,7 +109,8 @@ public class Zoho {
                 "fromAddress", mailboxAddress,
                 "toAddress", mailboxAddress,
                 "subject", msg.subject(),
-                "content", msg.content());
+                "content", msg.content(),
+                "mailFormat", "plaintext");
 
         OAuthRequest request = new OAuthRequest(Verb.POST, MAIL_API_BASE + ACCOUNTS + "/" + accountId + MESSAGES);
         request.addHeader("Content-Type", "application/json");
@@ -131,8 +135,7 @@ public class Zoho {
         var accessToken = new OAuth2AccessToken(tokenManager.getValidAccessToken());
 
         OAuthRequest request = new OAuthRequest(Verb.GET,
-                MAIL_API_BASE + ACCOUNTS + "/" + accountId + FOLDERS + "/" + inboxFolderId + MESSAGES + "/" + messageId
-                        + "/content");
+                MAIL_API_BASE + ACCOUNTS + "/" + accountId + MESSAGES + "/" + messageId + "/originalmessage");
         service.signRequest(accessToken, request);
 
         try (Response response = service.execute(request)) {
@@ -169,10 +172,12 @@ public class Zoho {
 
         try (Response response = service.execute(request)) {
             if (response.isSuccessful()) {
+                Log.info("Successfully retrieved messages with query: " + query);
                 var body = response.getBody();
                 var data = JSON.decode(body, ZohoMessagesReply.class).data();
                 if (data == null)
                     return List.of();
+                Log.info("Retrieved this id: " + data.stream().map(ZohoMessage::messageId).toList().get(0));
                 return data.stream().map(ZohoMessage::messageId).toList();
             } else {
                 System.err.println(response.getCode() + "/" + response.getBody());
@@ -183,6 +188,7 @@ public class Zoho {
 
     public void removeInboxMessage(String messageId) throws Exception {
         var accessToken = new OAuth2AccessToken(tokenManager.getValidAccessToken());
+        Log.info("removeInboxMessage: " + messageId + " folderId: " + inboxFolderId);
 
         OAuthRequest request = new OAuthRequest(Verb.DELETE,
                 MAIL_API_BASE + ACCOUNTS + "/" + accountId + FOLDERS + "/" + inboxFolderId + MESSAGES + "/"
@@ -191,6 +197,7 @@ public class Zoho {
         service.signRequest(accessToken, request);
 
         try (Response response = service.execute(request)) {
+            Log.info("removeInboxMessage response: " + response.getCode() + "/" + response.getBody());
             if (!response.isSuccessful()) {
                 System.err.println(response.getCode() + "/" + response.getBody());
             }
@@ -207,6 +214,19 @@ public class Zoho {
                 e.printStackTrace();
             }
         }
+    }
+
+    public ZohoMessage getMessageByCreationTime(long creationTime) throws Exception {
+        var zohoIds = getMessages(null);
+        for (var zohoId : zohoIds) {
+            var msg = getMessage(zohoId);
+            if (msg != null) {
+                var deserialized = ZohoMessageSerializer.deserialize(msg.content(), msg.subject());
+                if (deserialized != null && deserialized.getCreationTime() == creationTime)
+                    return msg;
+            }
+        }
+        return null;
     }
 
 }
